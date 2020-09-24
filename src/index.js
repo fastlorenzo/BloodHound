@@ -1,4 +1,4 @@
-import 'babel-polyfill'; // generators
+import '@babel/polyfill'; // generators
 import React from 'react';
 import ReactDOM from 'react-dom';
 
@@ -10,9 +10,12 @@ import AlertTemplate from 'react-alert-template-basic';
 import { remote, shell } from 'electron';
 const { app } = remote;
 import { join } from 'path';
-import { stat, writeFile, existsSync, mkdirSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync } from 'fs';
 
 import ConfigStore from 'electron-store';
+
+import 'react-bootstrap-typeahead/css/Typeahead.css';
+
 global.conf = new ConfigStore();
 global.imageconf = new ConfigStore({
     name: 'images',
@@ -21,35 +24,44 @@ import { EventEmitter2 as e } from 'eventemitter2';
 global.emitter = new e({});
 emitter.setMaxListeners(0);
 global.renderEmit = new e({});
-global.neo4j = require('neo4j-driver').v1;
+global.neo4j = require('neo4j-driver');
 global.Mustache = require('mustache');
 
 //open links externally by default
-$(document).on('click', 'a[href^="http"]', function(event) {
+$(document).on('click', 'a[href^="http"]', function (event) {
     event.preventDefault();
     shell.openExternal(this.href);
 });
 
-String.prototype.format = function() {
+String.prototype.format = function () {
     var i = 0,
         args = arguments;
-    return this.replace(/{}/g, function() {
+    return this.replace(/{}/g, function () {
         return typeof args[i] !== 'undefined' ? args[i++] : '';
     });
 };
 
-String.prototype.formatAll = function() {
+String.prototype.formatAll = function () {
     var args = arguments;
     return this.replace(/{}/g, args[0]);
 };
 
-String.prototype.toTitleCase = function() {
-    return this.replace(/\w\S*/g, function(txt) {
+String.prototype.formatn = function () {
+    var formatted = this;
+    for (var i = 0; i < arguments.length; i++) {
+        var regexp = new RegExp('\\{' + i + '\\}', 'gi');
+        formatted = formatted.replace(regexp, arguments[i]);
+    }
+    return formatted;
+};
+
+String.prototype.toTitleCase = function () {
+    return this.replace(/\w\S*/g, function (txt) {
         return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
     });
 };
 
-Array.prototype.allEdgesSameType = function() {
+Array.prototype.allEdgesSameType = function () {
     for (var i = 1; i < this.length; i++) {
         if (this[i].neo4j_type !== this[0].neo4j_type) return false;
     }
@@ -57,7 +69,7 @@ Array.prototype.allEdgesSameType = function() {
     return true;
 };
 
-Array.prototype.chunk = function() {
+Array.prototype.chunk = function () {
     let i = 0;
     let len = this.length;
     let temp = [];
@@ -71,22 +83,22 @@ Array.prototype.chunk = function() {
 };
 
 if (!Array.prototype.last) {
-    Array.prototype.last = function() {
+    Array.prototype.last = function () {
         return this[this.length - 1];
     };
 }
 
 sigma.renderers.def = sigma.renderers.canvas;
 
-sigma.classes.graph.addMethod('outboundNodes', function(id) {
+sigma.classes.graph.addMethod('outboundNodes', function (id) {
     return this.outNeighborsIndex.get(id).keyList();
 });
 
-sigma.classes.graph.addMethod('inboundNodes', function(id) {
+sigma.classes.graph.addMethod('inboundNodes', function (id) {
     return this.inNeighborsIndex.get(id).keyList();
 });
 
-sigma.classes.graph.addMethod('outNeighbors', function(id) {
+sigma.classes.graph.addMethod('outNeighbors', function (id) {
     return this.outNeighborsIndex.get(id).keyList();
 });
 
@@ -137,6 +149,12 @@ global.appStore = {
                 scale: 1.25,
                 color: '#7F72FD',
             },
+            Unknown: {
+                font: "'Font Awesome 5 Free'",
+                content: '\uF128',
+                scale: 1.25,
+                color: '#E6E600',
+            },
         },
         edgeScheme: {
             AdminTo: 'tapered',
@@ -163,6 +181,9 @@ global.appStore = {
             GetChanges: 'tapered',
             GetChangeAll: 'tapered',
             SQLAdmin: 'tapered',
+            ReadGMSAPassword: 'tapered',
+            HasSIDHistory: 'tapered',
+            CanPSRemote: 'tapered',
         },
     },
     lowResPalette: {
@@ -173,6 +194,7 @@ global.appStore = {
             Domain: '#17E6B9',
             OU: '#FFAA00',
             GPO: '#7F72FD',
+            Unknown: '#E6E600',
         },
         edgeScheme: {
             AdminTo: 'line',
@@ -199,6 +221,9 @@ global.appStore = {
             GetChanges: 'line',
             GetChangeAll: 'line',
             SQLAdmin: 'line',
+            ReadGMSAPassword: 'line',
+            HasSIDHistory: 'line',
+            CanPSRemote: 'line',
         },
     },
     highResStyle: {
@@ -293,6 +318,9 @@ if (typeof conf.get('edgeincluded') === 'undefined') {
         AddAllowedToAct: true,
         AllowedToAct: true,
         SQLAdmin: true,
+        ReadGMSAPassword: true,
+        HasSIDHistory: true,
+        CanPSRemote: true,
     });
 }
 
@@ -303,8 +331,8 @@ const alertOptions = {
     transitions: transitions.FADE,
     containerStyle: {
         zIndex: 100,
-        width: '25%'
-    }
+        width: '25%',
+    },
 };
 
 appStore.edgeincluded = conf.get('edgeincluded');
@@ -321,6 +349,21 @@ if (!appStore.edgeincluded.hasOwnProperty('AllowedToAct')) {
 
 if (!appStore.edgeincluded.hasOwnProperty('SQLAdmin')) {
     appStore.edgeincluded.SQLAdmin = true;
+    conf.set('edgeincluded', appStore.edgeincluded);
+}
+
+if (!appStore.edgeincluded.hasOwnProperty('ReadGMSAPassword')) {
+    appStore.edgeincluded.ReadGMSAPassword = true;
+    conf.set('edgeincluded', appStore.edgeincluded);
+}
+
+if (!appStore.edgeincluded.hasOwnProperty('HasSIDHistory')) {
+    appStore.edgeincluded.HasSIDHistory = true;
+    conf.set('edgeincluded', appStore.edgeincluded);
+}
+
+if (!appStore.edgeincluded.hasOwnProperty('CanPSRemote')) {
+    appStore.edgeincluded.HasSIDHistory = true;
     conf.set('edgeincluded', appStore.edgeincluded);
 }
 
@@ -342,37 +385,35 @@ if (typeof appStore.performance.darkMode === 'undefined') {
 }
 
 var custompath = join(app.getPath('userData'), 'customqueries.json');
-
-stat(custompath, function(err, stats) {
-    if (err) {
-        writeFile(custompath, '{}');
-    }
-});
+if (!existsSync(custompath)) {
+    writeFileSync(custompath, '{"queries": []}');
+}
 
 let imagepath = join(app.getPath('userData'), 'images');
 if (!existsSync(imagepath)) {
     mkdirSync(imagepath);
 }
 
-global.closeTooltip = function() {
-    if (appStore.currentTooltip !== null) {
-        appStore.currentTooltip.close();
-        appStore.currentTooltip = null;
-    }
+global.closeTooltip = function () {
+    emitter.emit('closeTooltip');
 };
 
-renderEmit.on('login', function() {
+renderEmit.on('login', function () {
     emitter.removeAllListeners();
     ReactDOM.unmountComponentAtNode(document.getElementById('root'));
     let Root = () => (
-        <AlertProvider id='alertContainer' template={AlertTemplate} {...alertOptions}>
+        <AlertProvider
+            id='alertContainer'
+            template={AlertTemplate}
+            {...alertOptions}
+        >
             <AppContainer />
         </AlertProvider>
     );
     ReactDOM.render(<Root />, document.getElementById('root'));
 });
 
-renderEmit.on('logout', function() {
+renderEmit.on('logout', function () {
     emitter.removeAllListeners();
     ReactDOM.unmountComponentAtNode(document.getElementById('root'));
     ReactDOM.render(<Login />, document.getElementById('root'));
